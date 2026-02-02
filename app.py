@@ -1,18 +1,22 @@
-from flask import Flask, render_template, request
+import streamlit as st
 import pickle
 import re
 import nltk
 from nltk.corpus import stopwords
 from nltk.stem.porter import PorterStemmer
 
-app = Flask(__name__)
+# Download NLTK data (only first time)
+nltk.download("stopwords")
 
+# Load model and vectorizer
 model = pickle.load(open("spam_model.pkl", "rb"))
 vectorizer = pickle.load(open("vectorizer.pkl", "rb"))
 
+# NLP tools
 ps = PorterStemmer()
 stop_words = set(stopwords.words("english"))
 
+# Text cleaning function
 def clean_message(text):
     text = text.lower()
     text = re.sub(r"[^\w\s]", " ", text)
@@ -24,25 +28,41 @@ def clean_message(text):
 
     return " ".join(words)
 
-@app.route("/", methods=["GET", "POST"])
-def home():
-    result = ""
-    message = ""
+# ================= UI =================
 
-    if request.method == "POST":
-        message = request.form.get("email")
+st.set_page_config(
+    page_title="Spam Email Detector",
+    page_icon="📧",
+    layout="centered"
+)
 
-        if not message or message.strip() == "":
-            result = "⚠️ Please enter an email message."
+st.title("📧 Spam Email Detection")
+st.write("Check whether an email message is **Spam** or **Not Spam**.")
+
+# Text input
+message = st.text_area(
+    "Enter email text:",
+    height=150,
+    placeholder="Type or paste the email message here..."
+)
+
+# Predict button
+if st.button("Check Email"):
+    if message.strip() == "":
+        st.warning("⚠️ Please enter an email message.")
+    else:
+        cleaned_message = clean_message(message)
+        vectorized_input = vectorizer.transform([cleaned_message])
+        prediction = model.predict(vectorized_input)[0]
+
+        if prediction == 1:
+            st.error("🚫 Spam ❌")
         else:
-            cleaned_message = clean_message(message)
-            vectorized_input = vectorizer.transform([cleaned_message])
-            prediction = model.predict(vectorized_input)[0]
+            st.success("✅ Not Spam")
 
-            result = "🚫 Spam ❌" if prediction == 1 else "✅ Not Spam"
-
-    return render_template("index.html", result=result, message=message)
-
-
-if __name__ == "__main__":
-    app.run(debug=True)
+# Footer
+st.markdown("---")
+st.markdown(
+    "<p style='text-align:center; font-size:13px;'>Designed by <b style='color:#4CAF50;'>Kiran Pawal</b></p>",
+    unsafe_allow_html=True
+)
